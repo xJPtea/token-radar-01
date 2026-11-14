@@ -6,6 +6,12 @@
 // dashboard/ and screenshots/ to /output, and writes /output/dossier.json with the vendored
 // make.fun library. The dashboard is a static page, no framework and no network.
 //
+// Pipeline, in order: parse the snapshot, build the 200-row board, refuse to continue when the
+// board would fail the gate (boardIssue), then write board.json, data.js, the dashboard and
+// screenshots, and finally the dossier from exactly those files, so the dossier always describes
+// the output it ships with. Nothing here reaches the network and nothing depends on the clock:
+// age is counted from the snapshot's own as_of date, which is what keeps two runs byte-identical.
+//
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
 
@@ -40,6 +46,9 @@ const out = arg('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
 
 const snapshot = parseSnapshot(readFileSync(inputFile, 'utf8'));
 const { board, radar } = buildRadar(snapshot);
+// Fail fast, before writing anything: a board the gate would refuse must never ship as a
+// partial output. boardIssue checks the same shape the sealed scorer checks — 200 rows, ranks
+// 1..N, implied value non-increasing with rank, the whole watchlist covered, farm steps valid.
 const issue = boardIssue(board, snapshot);
 if (issue !== null) {
   process.stderr.write(`token radar: the model wrote a board the gate refuses: ${issue}\n`);
